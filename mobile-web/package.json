@@ -1,0 +1,27 @@
+{
+  "name": "uzbudge",
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@pika/react": "^16.13.1",
+    "@pika/react-dom": "^16.13.1",
+    "antd-mobile": "^2.3.3",
+    "immer": "^7.0.5",
+    "lodash-es": "^4.17.15",
+    "react-redux": "^7.2.0",
+    "react-router-dom": "^5.2.0",
+    "redux": "^4.0.5",
+    "redux-devtools-extension": "^2.13.8",
+    "ts-action": "^11.0.0",
+    "ts-action-immer": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "^16.9.41",
+    "@types/react-dom": "^16.9.8",
+    "vite": "^1.0.0-beta.3",
+    "vite-plugin-react": "^3.0.0"
+  }
+}
