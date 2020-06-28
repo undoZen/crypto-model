@@ -1,32 +1,78 @@
-import React, { useState } from 'react'
-import logo from './logo.svg'
-import './App.css'
+import { Icon, TabBar } from "antd-mobile";
+import "antd-mobile/dist/antd-mobile.css";
+import React, { useLayoutEffect } from "react";
+import {
+  Redirect,
+  Route,
+  useHistory,
+  useLocation,
+  useRouteMatch,
+} from "react-router-dom";
+import "./App.css";
+import Counter from "./pages/top-list/counter";
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useLayoutEffect(() => {
+    document.querySelector(".am-tabs-pane-wrap-active").scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
 function App() {
-  const [count, setCount] = useState(0)
+  const matchPortfolioRoute = useRouteMatch({
+    path: "/portfolio",
+  });
+  const matchTopListRoute = useRouteMatch({
+    path: "/top-list",
+  });
+  const rootRoutePath = matchPortfolioRoute?.path || matchTopListRoute?.path;
+  const history = useHistory();
+  if (!rootRoutePath) {
+    return <Redirect to="/portfolio" />;
+  }
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>Hello Vite + React!</p>
-        <p>
-          <button onClick={() => setCount(count => count + 1)}>count is: {count}</button>
-        </p>
-        <p>
-          Edit <code>App.jsx</code> and save to test HMR updates.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
+    <div style={{ position: "fixed", height: "100%", width: "100%", top: 0 }}>
+      <ScrollToTop />
+      <TabBar
+        unselectedTintColor="#949494"
+        tintColor="#33A3F4"
+        barTintColor="white"
+        tabBarPosition="bottom"
+        prerenderingSiblingsNumber={0}
+      >
+        <TabBar.Item
+          title="Portfolio"
+          key="Portfolio"
+          selected={rootRoutePath === "/portfolio"}
+          // badge={1}
+          onPress={() => {
+            history.push("/portfolio");
+          }}
+          icon={<Icon type="check-circle-o" size="md" />}
+          selectedIcon={<Icon type="check-circle" size="md" />}
         >
-          Learn React
-        </a>
-      </header>
+          <Route path="/portfolio">
+            <p>hello</p>
+          </Route>
+        </TabBar.Item>
+        <TabBar.Item
+          title="TopList"
+          key="TopList"
+          selected={rootRoutePath === "/top-list"}
+          onPress={() => {
+            history.push("/top-list");
+          }}
+          icon={<Icon type="cross-circle" size="md" />}
+          selectedIcon={<Icon type="cross-circle-o" size="md" />}
+        >
+          <Route path="/top-list">
+            <Counter />
+          </Route>
+        </TabBar.Item>
+      </TabBar>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
