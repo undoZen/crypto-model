@@ -1,5 +1,4 @@
 import { Icon, TabBar } from "antd-mobile";
-import "antd-mobile/dist/antd-mobile.css";
 import React, { useLayoutEffect } from "react";
 import {
   Redirect,
@@ -9,7 +8,8 @@ import {
   useRouteMatch,
 } from "react-router-dom";
 import "./App.css";
-import Counter from "./pages/top-list/counter";
+import TopList from "./pages/top-list/counter";
+import Counter from "./pages/counter";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -53,7 +53,7 @@ function App() {
           selectedIcon={<Icon type="check-circle" size="md" />}
         >
           <Route path="/portfolio">
-            <p>hello</p>
+            <Counter />
           </Route>
         </TabBar.Item>
         <TabBar.Item
@@ -67,7 +67,7 @@ function App() {
           selectedIcon={<Icon type="cross-circle-o" size="md" />}
         >
           <Route path="/top-list">
-            <Counter />
+            <TopList />
           </Route>
         </TabBar.Item>
       </TabBar>

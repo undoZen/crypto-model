@@ -1,6 +1,10 @@
-# uzbudget
-遊真学预算，对作者本人来说最易用的记账、预算软件。
+# crypto-model
 
-2020 更新：我需要一个项目来演示我的基于 redux saga 和 hooks 的状态管理、副作用管理框架 model-container，于是用这个作为例子。
+一个用来演示 model-container 这个状态管理、副作用管理框架的 demo 项目。
 
-需要用这套框架的朋友，可以先用这个项目 fork 后修改（之后会总结成更完善的代码模板 start kit）。
+model-container 是基于 `redux`, `redux-saga`, `immer` 和 react hooks 的状态管理、副作用管理框架，这里没有新造的轮子，而只是讨论如何把现有的上面列举的这些库很好的整合起来。它的核心思想主要是：
+
+1. 抽象一层，把 dva、vuex 等库的 module 分割做成 model 原型、需要给一个 instanceId 实例化之后才能用，于是把 redux 的状态管理做成类似面向对象的 class-instance 模式，避免了传统 redux 应用方式的各种 map selector combineReducer 等等难用的姿势；
+2. 使用 `<Model.Provider>` 用 react 的 context 来自动初始化和使用实例，把父子组件的 props 传递干掉。
+
+目前这里只是一个尝鲜版的 PoC 演示，会快速迭代更新，待较稳定时总结为 model-container 库。
