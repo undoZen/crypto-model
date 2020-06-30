@@ -134,26 +134,28 @@ export const createModelContainer = (modelName, initialState) => {
 
   function useRunSaga(instanceId: string, saga, cacheRef?) {
     const defaultCacheRef = useRef(null);
-    const useHook = !!cacheRef ? useMemo : useLayoutEffect;
+    // const useHook = !!cacheRef ? useMemo : useLayoutEffect;
     cacheRef = cacheRef || defaultCacheRef;
 
     let sagaRun = cacheRef.current;
     useLayoutEffect(() => {
-      if (sagaRun && saga !== sagaRun.saga && sagaRun.cancel) {
-        console.log("cancel saga", instanceId);
-        sagaRun.cancel();
-        sagaRun.saga = saga;
+      if (sagaRun && saga !== sagaRun.saga) {
+        if (sagaRun.task?.isRunning?.()) {
+          console.log("cancel saga", instanceId);
+          sagaRun.task.cancel();
+        }
       }
-      if (!sagaRun) {
+      if (!sagaRun || saga !== sagaRun.saga) {
         // debugger;
         sagaRun = cacheRef.current = {
-          cancel: runSaga(saga),
+          task: runSaga(saga),
           saga,
         };
       }
       return () => {
-        if (sagaRun.cancel && typeof sagaRun.cancel === "function") {
-          sagaRun.cancel();
+        if (typeof sagaRun?.task?.cancel === "function") {
+          // debugger;
+          sagaRun.task.cancel();
         }
       };
     }, [instanceId]);
