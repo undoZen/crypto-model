@@ -77,6 +77,7 @@ export const store = createStore(
     }
     const modelNamespacedState = rootState[namespace] || {};
     const reducer = modelReducers[namespace] || identity;
+    console.log("reducer", modelReducers, reducer);
     rootState[namespace] = produce(modelNamespacedState, (state) => {
       if (guard(initialize)(action)) {
         // debugger;
@@ -114,8 +115,17 @@ const EMPTY: unique symbol = Symbol();
 export const createModelContainer = (modelName, initialState) => {
   let reducer = createReducer(initialState);
   modelReducers[modelName] = reducer;
+  console.log("cmc", modelReducers);
+  let Context = React.createContext<string | typeof EMPTY>(EMPTY);
 
-  const Context = React.createContext<string | typeof EMPTY>(EMPTY);
+  const extend = (_modelName, initialState) => {
+    modelName = _modelName;
+    modelReducers[modelName] = reducer = reducer.replaceInitialState(
+      initialState
+    );
+    Context = React.createContext<string | typeof EMPTY>(EMPTY);
+    return getContext();
+  };
 
   function decorateAction(instanceId) {
     return (action) => ({
@@ -132,28 +142,41 @@ export const createModelContainer = (modelName, initialState) => {
     };
   }
 
-  function useRunSaga(instanceId: string, saga, cacheRef?) {
+  function useRunSaga(instanceId: string, saga, cacheRef?, runMore?) {
+    if (!saga || typeof saga !== "function") {
+      return;
+    }
     const defaultCacheRef = useRef(null);
-    const useHook = !!cacheRef ? useMemo : useLayoutEffect;
+    // const useHook = !!cacheRef ? useMemo : useLayoutEffect;
     cacheRef = cacheRef || defaultCacheRef;
 
     let sagaRun = cacheRef.current;
     useLayoutEffect(() => {
-      if (sagaRun && saga !== sagaRun.saga && sagaRun.cancel) {
-        console.log("cancel saga", instanceId);
-        sagaRun.cancel();
-        sagaRun.saga = saga;
+      if (sagaRun && saga !== sagaRun.saga) {
+        if (sagaRun.task?.isRunning?.()) {
+          console.log("cancel saga", instanceId);
+          sagaRun.task.cancel();
+        }
       }
-      if (!sagaRun) {
+      if (!sagaRun || saga !== sagaRun.saga) {
         // debugger;
         sagaRun = cacheRef.current = {
-          cancel: runSaga(saga),
+          task: runSaga(saga),
           saga,
         };
       }
+      console.log("saga run");
+      let runMoreCallback;
+      if (typeof runMore === "function") {
+        runMoreCallback = runMore();
+      }
       return () => {
-        if (sagaRun.cancel && typeof sagaRun.cancel === "function") {
-          sagaRun.cancel();
+        if (typeof sagaRun?.task?.cancel === "function") {
+          // debugger;
+          sagaRun.task.cancel();
+        }
+        if (typeof runMoreCallback === "function") {
+          runMoreCallback();
         }
       };
     }, [instanceId]);
@@ -175,25 +198,39 @@ export const createModelContainer = (modelName, initialState) => {
       cacheRef = { current: null };
       sagaRunCache.set(instanceId, cacheRef);
     }
-    // debugger;
-    if (hasSaga) {
-      console.log("hasSaga");
-      useRunSaga(instanceId, getSaga(instanceId), cacheRef);
-    }
     let justInited;
-    console.log("store.getState()", store.getState());
-
     const modelNamespacedState = store.getState()[modelName] || {};
+    console.log(
+      "store.getState()",
+      store.getState(),
+      "justInited",
+      justInited,
+      instanceId in modelNamespacedState
+    );
     if (!(instanceId in modelNamespacedState)) {
-      // debugger;
-      justInited = initialize();
-      dispatchTo(instanceId)(justInited);
+      dispatchTo(instanceId)(
+        (justInited = decorateAction(instanceId)(
+          typeof actions.initialize === "function"
+            ? actions.initialize()
+            : { type: "initialize" }
+        ))
+      );
     }
     useLayoutEffect(() => {
+      justInited = decorateAction(instanceId)(
+        typeof actions.mounted === "function"
+          ? actions.mounted()
+          : { type: "mounted" }
+      );
+    }, []);
+
+    console.log("hasSaga", hasSaga);
+    useRunSaga(instanceId, hasSaga && getSaga(instanceId), cacheRef, () => {
+      console.log("111 justInited", justInited);
       if (justInited) {
         sagaChannel.put(justInited);
       }
-    }, [justInited]);
+    });
     return (
       <Context.Provider value={instanceId}>{props.children}</Context.Provider>
     );
@@ -310,7 +347,9 @@ export const createModelContainer = (modelName, initialState) => {
   return getContext();
   function getContext() {
     return {
+      extend,
       modelName,
+
       actions,
       getters,
 
@@ -321,8 +360,24 @@ export const createModelContainer = (modelName, initialState) => {
       defineActions,
       defineGetters,
       // useContextInstance,
+      putTo,
+      selectFrom,
     };
   }
+
+  function putTo(instanceId, action) {
+    return put({
+      ...action,
+      meta: {
+        modelName,
+        instanceId,
+      },
+    });
+  }
+  function selectFrom(instanceId, selector) {
+    return select((state) => selector(get(state, [modelName, instanceId])));
+  }
+
   function defineActions(_actions) {
     forEach(_actions, (options, type) => {
       const actionCreator =

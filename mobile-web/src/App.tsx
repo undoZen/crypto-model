@@ -8,7 +8,7 @@ import {
   useRouteMatch,
 } from "react-router-dom";
 import "./App.css";
-import TopList from "./pages/top-list/counter";
+import TopList from "./pages/top-list";
 import Counter from "./pages/counter";
 
 function ScrollToTop() {
