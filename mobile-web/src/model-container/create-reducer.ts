@@ -64,6 +64,12 @@ export function createReducer<S>(
     return extend(handlers);
   };
 
+  const replaceInitialState: CreateReducer<S>["replaceDefaultReducer"] = (
+    initialState
+  ) => {
+    return createReducer(initialState, handlers, defaultReducer);
+  };
+
   const replaceDefaultReducer: CreateReducer<S>["replaceDefaultReducer"] = (
     defaultReducer
   ) => {
@@ -77,6 +83,7 @@ export function createReducer<S>(
       extend,
       defaultReducer,
       replaceDefaultReducer,
+      replaceInitialState,
     })
   );
 }
