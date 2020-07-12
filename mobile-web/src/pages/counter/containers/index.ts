@@ -1,5 +1,5 @@
 import { delay, race } from "redux-saga/effects";
-import { createModelContainer } from "../../../model-container";
+import { createModelContainer } from "model-container";
 
 export const CounterModel = createModelContainer("counter", {
   count: 0,

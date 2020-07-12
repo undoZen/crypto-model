@@ -3,18 +3,23 @@ import { CounterModel } from "./containers";
 
 export default function Wrapper() {
   return (
-    <CounterModel.Provider instanceId="default">
+    <CounterModel instanceId="default">
       <Counter />
-    </CounterModel.Provider>
+    </CounterModel>
   );
 }
 function Counter() {
-  const { incr, decr, reset, cancel } = CounterModel.useInstance().dispatcher;
+  const {
+    incr,
+    decr,
+    reset,
+    cancel,
+  } = CounterModel.useInstanceFromContext().dispatcher;
 
-  const count = CounterModel.useInstance().useSelector(
+  const count = CounterModel.useInstanceFromContext().useSelector(
     CounterModel.getters.count
   );
-  const countdown = CounterModel.useInstance().useSelector(
+  const countdown = CounterModel.useInstanceFromContext().useSelector(
     CounterModel.getters.countdown
   );
 

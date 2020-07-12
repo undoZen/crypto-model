@@ -6,30 +6,31 @@ import { StringListContainer } from "../../containers";
 export default function Container() {
   return (
     <>
-      <CoinSymbolsContainer.Provider instanceId="default">
+      <CoinSymbolsContainer instanceId="default">
         <TopList />
-      </CoinSymbolsContainer.Provider>
+      </CoinSymbolsContainer>
     </>
   );
 }
 
 function TopList() {
   const topSymbols =
-    StringListContainer.useInstance("topCoinsSymbol").useState() || [];
+    StringListContainer.useInstanceById("topCoinsSymbol").useState() || [];
   console.log("topSymbols", topSymbols);
+  debugger;
   return (
     <>
       {topSymbols.map((symbol) => (
-        <CoinContainer.Provider instanceId={symbol}>
+        <CoinContainer instanceId={symbol}>
           <CoinInfo />
-        </CoinContainer.Provider>
+        </CoinContainer>
       ))}
     </>
   );
 }
 
 function CoinInfo() {
-  const state = CoinContainer.useInstance().useState();
+  const state = CoinContainer.useInstanceFromContext().useState();
   return (
     <div style={{ margin: "10px 5px" }}>
       name: {state.name}
