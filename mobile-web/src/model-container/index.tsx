@@ -50,7 +50,14 @@ export const initialize = createAction(
   "initialize",
   (payload: unknown) => payload
 );
-const composeEnhancers = composeWithDevTools({});
+const composeEnhancers = composeWithDevTools({
+  actionSanitizer: (action: Action<any>, id: number) => {
+    return {
+      ...action,
+      type: `${action.type} (${action?.meta?.modelName}|${action?.meta?.instanceId})`,
+    };
+  },
+});
 
 const sagaChannel = stdChannel();
 const sageMiddleware = createSagaMiddleware({ channel: sagaChannel });
@@ -335,7 +342,7 @@ export const createModelContainer = (
       throw new Error("`instanceId` prop for useInstanceById() is required");
     }
     ensureInstance({ instanceId, initialState, initializePayload });
-    useRunDefaultSaga({ instanceId });
+    // useRunDefaultSaga({ instanceId });
     return getInstance(instanceId);
   }
   function getInstance(instanceId: string) {

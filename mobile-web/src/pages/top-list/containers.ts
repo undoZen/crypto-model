@@ -61,7 +61,12 @@ export const CoinSymbolsContainer = StringListContainer.extend(
         console.log(response);
         const mcTop = response.data.data.market_cap_percentage;
         const topSymbol = map(sortBy(toPairs(mcTop), 1).reverse(), "0");
-        console.log(topSymbol);
+        console.log(
+          "topSymbol",
+          topSymbol,
+          StringListContainer.actions.replace(topSymbol)
+        );
+        // debugger;
 
         response = yield call(request, {
           url: "https://api.coingecko.com/api/v3/simple/price",
