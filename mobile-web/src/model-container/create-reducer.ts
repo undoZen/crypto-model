@@ -1,36 +1,48 @@
-import { Action, On, Reducer } from "ts-action";
+import { Reducer } from "react";
+import { Reducer as ReduxReducer } from "redux";
+import { Action, On, Reducer as TsActionReducer } from "ts-action";
 
 type InitialHandlers<S> = {
   [key: string]: (state: S, action: Action<string>) => S;
 };
-type CreateReducer<S> = Reducer<S> &
+type CreateReducer<S> = TsActionReducer<S> &
   Readonly<{
     handlers: InitialHandlers<S>;
     handle: (on: On<S>) => CreateReducer<S>;
     extend: (handlers: InitialHandlers<S>) => CreateReducer<S>;
-    defaultReducer?: Reducer<S>;
-    replaceDefaultReducer: (reducer: Reducer<S>) => CreateReducer<S>;
+    defaultReducer?: Reducer<S, Action<string>>;
+    replaceDefaultReducer: (
+      reducer: Reducer<S, Action<string>>
+    ) => CreateReducer<S>;
   }>;
 export function createReducer<S>(
   initialState: S,
+  defaultReducer: Reducer<S, Action<string>>
+): CreateReducer<S>;
+export function createReducer<S>(
+  initialState: S,
   initialHandlers: InitialHandlers<S>,
-  defaultReducer: Reducer<S>
-);
+  defaultReducer: Reducer<S, Action<string>>
+): CreateReducer<S>;
 export function createReducer<S>(
   initialState: S,
   initialHandlers: InitialHandlers<S>
-);
+): CreateReducer<S>;
 export function createReducer<S>(initialState: S): CreateReducer<S>;
 export function createReducer<S>(
   initialState: S,
-  initialHandlers?: InitialHandlers<S>,
-  defaultReducer?: Reducer<S>
+  initialHandlers?: InitialHandlers<S> | Reducer<S, Action<string>>,
+  defaultReducer?: Reducer<S, Action<string>>
 ): CreateReducer<S> {
+  if (typeof initialHandlers === "function") {
+    defaultReducer = initialHandlers;
+    initialHandlers = {};
+  }
   const handlers: InitialHandlers<S> = {
     ...initialHandlers,
   };
 
-  const rootReducer: Reducer<S> = (
+  const rootReducer: Reducer<S, Action<string>> = (
     state = initialState,
     action: Action<string>
   ) => {
