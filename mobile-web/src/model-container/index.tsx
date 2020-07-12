@@ -1,63 +1,54 @@
-import produce from "immer";
-import {
-  get,
-  identity,
-  mapValues,
-  memoize,
-  initial,
-  forEach,
-  values,
-} from "lodash-es";
+import produce from 'immer';
+import { forEach, get, identity, mapValues, values } from 'lodash-es';
 import React, {
   createContext,
-  FC,
-  HTMLAttributes,
-  ReactChild,
   useContext,
   useLayoutEffect,
-  useMemo,
   useRef,
-} from "react";
-import { createSelectorHook, Provider } from "react-redux";
-import { Action, applyMiddleware, createStore } from "redux";
-import _rde from "redux-devtools-extension";
-// export { createAction, createActions, createReducer };
-import createSagaMiddleware, { stdChannel } from "redux-saga";
-import { action, guard, payload, reducer } from "ts-action";
-import { on } from "ts-action-immer";
+  Component,
+  Context,
+} from 'react';
 import {
-  ActionsMap,
+  createSelectorHook,
+  Provider,
+  ReactReduxContextValue,
+} from 'react-redux';
+import { Action, applyMiddleware, createStore } from 'redux';
+import { composeWithDevTools } from 'redux-devtools-extension';
+import createSagaMiddleware, { stdChannel } from 'redux-saga';
+import {
+  call,
+  fork,
+  put,
+  select,
+  take,
+  takeEvery,
+  takeLatest,
+  takeLeading,
+} from 'redux-saga/effects';
+import { guard } from 'ts-action';
+import { on } from 'ts-action-immer';
+import { createAction } from './create-action';
+import { createReducer } from './create-reducer';
+import {
   ActionsToMethods,
   ActionsToMethodsCTC,
   ActionsToMethodsCTV,
-  AnyStateReducer,
-  Container,
   ContainerProviderProps,
-  CreateContainer,
-  CreateContainerOptions,
   Selector,
   UseStateOptions,
-} from "./internal.types";
-import { createAction } from "./create-action";
-import { createReducer } from "./create-reducer";
-import {
-  takeLatest,
-  takeLeading,
-  takeEvery,
-  fork,
-  put,
-  call,
-  take,
-  select,
-} from "redux-saga/effects";
-const { composeWithDevTools } = _rde; // must be fixed later
+} from './internal.types';
 
-export const ModelContainerContext = createContext(null);
+export { createAction, createReducer };
+
+export const ModelContainerContext = createContext<
+  ReactReduxContextValue<RootState>
+>(null!);
 export const useRootSelector = createSelectorHook(ModelContainerContext);
 
 export const initialize = createAction(
-  "initialize",
-  (payload: unknown) => payload
+  'initialize',
+  (payload: unknown) => payload,
 );
 const composeEnhancers = composeWithDevTools({});
 
@@ -69,37 +60,47 @@ interface RootState {
   [key: string]: { [key: string]: any };
 }
 export const store = createStore(
-  produce((rootState, action) => {
-    const namespace = action?.meta?.modelName;
-    const instanceId = action?.meta?.instanceId;
-    if (!namespace || !instanceId) {
-      return;
-    }
-    const modelNamespacedState = rootState[namespace] || {};
-    const reducer = modelReducers[namespace] || identity;
-    console.log("reducer", modelReducers, reducer);
-    rootState[namespace] = produce(modelNamespacedState, (state) => {
-      if (guard(initialize)(action)) {
-        // debugger;
-        state[instanceId] = reducer(
-          state[instanceId] || action?.meta?.initialState,
-          action
-        );
-      } else {
-        if (!(instanceId in state)) {
-          state[instanceId] = reducer(undefined, initialize({ instanceId }));
-        }
-        state[instanceId] = reducer(state[instanceId], action);
+  createReducer(
+    {} as RootState,
+    produce((rootState, action) => {
+      if (!rootState) {
+        return {};
       }
-    });
-  }),
-  {},
-  composeEnhancers(applyMiddleware(sageMiddleware))
+      const namespace = action?.meta?.modelName;
+      const instanceId = action?.meta?.instanceId;
+      if (!namespace || !instanceId) {
+        return;
+      }
+      const modelNamespacedState = rootState[namespace] || {};
+      const reducer = modelReducers[namespace] || identity;
+      // console.log('reducer', modelReducers, reducer);
+      rootState[namespace] = produce(modelNamespacedState, state => {
+        if (guard(initialize)(action)) {
+          // debugger;
+          state[instanceId] = reducer(
+            state[instanceId] || action?.meta?.initialState,
+            action,
+          );
+        } else {
+          if (!(instanceId in state)) {
+            state[instanceId] = reducer(undefined, initialize({ instanceId }));
+          }
+          state[instanceId] = reducer(state[instanceId], action);
+        }
+      });
+    }),
+  ),
+  composeEnhancers(applyMiddleware(sageMiddleware)),
 );
 
-export function ModelContainerProvider({ children }) {
+export function ModelContainerProvider({ children }: { children: Component }) {
   return (
-    <Provider store={store} context={ModelContainerContext}>
+    <Provider
+      store={store}
+      context={
+        ModelContainerContext as Context<ReactReduxContextValue<RootState>>
+      }
+    >
       {children}
     </Provider>
   );
@@ -112,25 +113,29 @@ const modelActionCreators = {};
 const sagaRunCacheMap = {};
 const instanceComponentCount = {};
 const EMPTY: unique symbol = Symbol();
-export const createModelContainer = (modelName, initialState) => {
+export const createModelContainer = (
+  modelName: string,
+  initialState: { [key: string]: any },
+) => {
   let reducer = createReducer(initialState);
   modelReducers[modelName] = reducer;
-  console.log("cmc", modelReducers);
+  console.log('cmc', modelReducers);
   let Context = React.createContext<string | typeof EMPTY>(EMPTY);
 
   const extend = (_modelName, initialState) => {
     modelName = _modelName;
     modelReducers[modelName] = reducer = reducer.replaceInitialState(
-      initialState
+      initialState,
     );
     Context = React.createContext<string | typeof EMPTY>(EMPTY);
     return getContext();
   };
 
   function decorateAction(instanceId) {
-    return (action) => ({
+    return action => ({
       ...action,
       meta: {
+        ...action.meta,
         modelName,
         instanceId,
       },
@@ -143,7 +148,7 @@ export const createModelContainer = (modelName, initialState) => {
   }
 
   function useRunSaga(instanceId: string, saga, cacheRef?, runMore?) {
-    if (!saga || typeof saga !== "function") {
+    if (!saga || typeof saga !== 'function') {
       return;
     }
     const defaultCacheRef = useRef(null);
@@ -154,7 +159,7 @@ export const createModelContainer = (modelName, initialState) => {
     useLayoutEffect(() => {
       if (sagaRun && saga !== sagaRun.saga) {
         if (sagaRun.task?.isRunning?.()) {
-          console.log("cancel saga", instanceId);
+          console.log('cancel saga', instanceId);
           sagaRun.task.cancel();
         }
       }
@@ -165,17 +170,17 @@ export const createModelContainer = (modelName, initialState) => {
           saga,
         };
       }
-      console.log("saga run");
+      console.log('saga run');
       let runMoreCallback;
-      if (typeof runMore === "function") {
+      if (typeof runMore === 'function') {
         runMoreCallback = runMore();
       }
       return () => {
-        if (typeof sagaRun?.task?.cancel === "function") {
+        if (typeof sagaRun?.task?.cancel === 'function') {
           // debugger;
           sagaRun.task.cancel();
         }
-        if (typeof runMoreCallback === "function") {
+        if (typeof runMoreCallback === 'function') {
           runMoreCallback();
         }
       };
@@ -190,122 +195,151 @@ export const createModelContainer = (modelName, initialState) => {
   let actions = {};
   let getters = {};
 
-  function Provider(props: ContainerProviderProps<State>) {
-    const { instanceId, initialState } = props;
+  const getDefaultActionDecorator = ({
+    instanceId,
+    initialState,
+    initializePayload,
+  }) => (type: string) => {
+    const action = decorateAction(instanceId)(
+      typeof actions[type] === 'function' ? actions[type]() : { type },
+    );
+    if (type === 'initialize' && initialState) {
+      return {
+        ...action,
+        payload: initializePayload ? initializePayload : action.payload,
+        meta: { ...action.meta, ...(initialState ? { initialState } : {}) },
+      };
+    }
+    return action;
+  };
 
+  function ensureInstance(props) {
+    const { instanceId } = props;
+    const getDefaultAction = getDefaultActionDecorator(props);
+    const modelNamespacedState = store.getState()[modelName] || {};
+    console.log(
+      'ensureInstance',
+      instanceId,
+      instanceId in modelNamespacedState,
+    );
+    if (!(instanceId in modelNamespacedState)) {
+      console.log('initialize action', getDefaultAction('initialize'));
+      dispatchTo(instanceId)(getDefaultAction('initialize'));
+    }
+  }
+  function useRunDefaultSaga(props) {
+    const { instanceId } = props;
+    const getDefaultAction = getDefaultActionDecorator(props);
     let cacheRef = sagaRunCache.get(instanceId);
     if (!cacheRef) {
       cacheRef = { current: null };
       sagaRunCache.set(instanceId, cacheRef);
     }
     let justInited;
-    const modelNamespacedState = store.getState()[modelName] || {};
-    console.log(
-      "store.getState()",
-      store.getState(),
-      "justInited",
-      justInited,
-      instanceId in modelNamespacedState
-    );
-    if (!(instanceId in modelNamespacedState)) {
-      dispatchTo(instanceId)(
-        (justInited = decorateAction(instanceId)(
-          typeof actions.initialize === "function"
-            ? actions.initialize()
-            : { type: "initialize" }
-        ))
-      );
-    }
+    console.log('store.getState()', store.getState(), 'justInited', justInited);
     useLayoutEffect(() => {
-      justInited = decorateAction(instanceId)(
-        typeof actions.mounted === "function"
-          ? actions.mounted()
-          : { type: "mounted" }
-      );
+      justInited = getDefaultAction('mounted');
     }, []);
 
-    console.log("hasSaga", hasSaga);
+    console.log('hasSaga', hasSaga);
     useRunSaga(instanceId, hasSaga && getSaga(instanceId), cacheRef, () => {
-      console.log("111 justInited", justInited);
+      console.log('111 justInited', justInited);
       if (justInited) {
         sagaChannel.put(justInited);
       }
     });
+  }
+
+  function Provider(props: ContainerProviderProps<State>) {
+    const { instanceId } = props;
+    ensureInstance(props);
+    useRunDefaultSaga(props);
     return (
       <Context.Provider value={instanceId}>{props.children}</Context.Provider>
     );
   }
-
-  Provider.displayName = modelName + "ModelContainerProvider";
-  function useDispatch() {
-    const ctx = useContext(Context);
-    if (ctx === EMPTY) {
-      throw new Error("Component must be wrapped with <Container.Provider>");
-    }
-    return ctx.dispatch;
-  }
   function getGetters(instanceId: string) {
-    return mapValues(getters, (selector) => (...args: any[]) => {
+    return mapValues(getters, selector => (...args: any[]) => {
       const state = store.getState();
       return selector(get(state, [modelName, instanceId]), state, ...args);
     });
   }
   function getGuards(instanceId: string) {
-    return mapValues(actions, (actionCreator) => (action) =>
+    return mapValues(actions, actionCreator => action =>
       action?.meta?.modelName === modelName &&
       action?.meta?.instanceId === instanceId &&
-      guard(actionCreator)(action)
+      guard(actionCreator)(action),
     );
   }
   function getDispatcher(dispatch) {
-    return mapValues(actions, (action) => (payload: any) =>
-      dispatch(action(payload))
+    return mapValues(actions, action => (payload: any) =>
+      dispatch(action(payload)),
     );
   }
   function getNullaryDispatcher(dispatcher): ActionsToMethods<Actions> {
-    return mapValues(dispatcher, (da) => () => da());
+    return mapValues(dispatcher, da => () => da());
   }
   function getCurrentTargetValueDispatcher(
-    dispatcher
+    dispatcher,
   ): ActionsToMethodsCTV<Actions> {
-    return mapValues(dispatcher, (da) => (payload) =>
-      da(payload.currentTarget.value)
+    return mapValues(dispatcher, da => payload =>
+      da(payload.currentTarget.value),
     );
   }
   function getCurrentTargetCheckedDispatcher(
-    dispatcher
+    dispatcher,
   ): ActionsToMethodsCTC<Actions> {
-    return mapValues(dispatcher, (da) => (payload) =>
-      da(payload.currentTarget.value)
+    return mapValues(dispatcher, da => payload =>
+      da(payload.currentTarget.checked),
     );
+  }
+  function getTargetValueDispatcher(dispatcher): ActionsToMethodsCTV<Actions> {
+    return mapValues(dispatcher, da => payload => da(payload.target.value));
+  }
+  function getTargetCheckedDispatcher(
+    dispatcher,
+  ): ActionsToMethodsCTC<Actions> {
+    return mapValues(dispatcher, da => payload => {
+      console.log(11123, payload);
+      return da(payload.target.checked);
+    });
   }
 
   function useState(instanceId: string) {
-    return useRootSelector((state) => get(state, [modelName, instanceId]));
+    return useRootSelector(state => get(state, [modelName, instanceId]));
   }
   function useSelector(instanceId: string, selector: Selector | string) {
-    return useRootSelector((state) => {
-      if (typeof selector === "string") {
+    return useRootSelector(state => {
+      if (typeof selector === 'string') {
         selector = getters[selector];
       }
       return selector(get(state, [modelName, instanceId]), state);
     });
   }
 
-  function useInstance(instanceId?: string) {
-    const ctx = useContext(Context);
-    if (!instanceId) {
-      if (ctx === EMPTY) {
-        throw new Error(
-          "Either provide a `instanceId` to useInstance() or use it under <SomeModelContainer.Provider instanceId={instanceId}>"
-        );
-      }
-      instanceId = ctx;
+  function useInstanceFromContext() {
+    const instanceId = useContext(Context);
+    if (!instanceId === EMPTY) {
+      throw new Error(
+        'useInstanceFromContext() must be used under <SomeModelContainer instanceId={instanceId}>',
+      );
     }
     return getInstance(instanceId);
   }
+  function useInstanceById(
+    instanceId: string,
+    initialState: any,
+    initializePayload: any,
+  ) {
+    if (!instanceId) {
+      throw new Error('`instanceId` prop for useInstanceById() is required');
+    }
+    ensureInstance({ instanceId, initialState, initializePayload });
+    useRunDefaultSaga({ instanceId });
+    return getInstance(instanceId);
+  }
   function getInstance(instanceId: string) {
-    console.log("getInstance:", instanceId);
+    console.log('getInstance:', instanceId);
     const dispatch = dispatchTo(instanceId);
     return {
       dispatch,
@@ -331,6 +365,12 @@ export const createModelContainer = (modelName, initialState) => {
       get currentTargetCheckedDispatcher() {
         return getCurrentTargetCheckedDispatcher(getDispatcher(dispatch));
       },
+      get targetValueDispatcher() {
+        return getTargetValueDispatcher(getDispatcher(dispatch));
+      },
+      get targetCheckedDispatcher() {
+        return getTargetCheckedDispatcher(getDispatcher(dispatch));
+      },
 
       useState(options?: UseStateOptions) {
         return useState(instanceId);
@@ -338,31 +378,30 @@ export const createModelContainer = (modelName, initialState) => {
       useSelector(selector: Selector, options?: UseStateOptions) {
         return useSelector(instanceId, selector);
       },
-      useRunSaga: (saga) => {
+      useRunSaga: saga => {
         useRunSaga(instanceId, saga);
       },
     };
   }
 
-  return getContext();
   function getContext() {
-    return {
+    return Object.assign(Provider, {
       extend,
       modelName,
 
       actions,
       getters,
 
-      Provider,
       dispatchTo,
-      useInstance,
+      useInstanceById,
+      useInstanceFromContext,
       getInstance,
       defineActions,
       defineGetters,
       // useContextInstance,
       putTo,
       selectFrom,
-    };
+    });
   }
 
   function putTo(instanceId, action) {
@@ -375,24 +414,24 @@ export const createModelContainer = (modelName, initialState) => {
     });
   }
   function selectFrom(instanceId, selector) {
-    return select((state) => selector(get(state, [modelName, instanceId])));
+    return select(state => selector(get(state, [modelName, instanceId])));
   }
 
   function defineActions(_actions) {
     forEach(_actions, (options, type) => {
       const actionCreator =
-        typeof options.createWithPayload === "function"
+        typeof options.createWithPayload === 'function'
           ? createAction(type, options.createWithPayload)
           : createAction(type);
       actions = {
         ...actions,
         [type]: actionCreator,
       };
-      if (typeof options.saga === "function") {
+      if (typeof options.saga === 'function') {
         hasSaga = true;
         sagas = {
           ...sagas,
-          [type]: function* (instanceId) {
+          [type]: function*(instanceId) {
             yield (
               {
                 latest: takeLatest,
@@ -400,22 +439,24 @@ export const createModelContainer = (modelName, initialState) => {
                 every: takeEvery,
               }[options.sagaTakeType] || takeLatest
             )(
-              (action) =>
+              action =>
                 action?.meta?.modelName === modelName &&
                 action?.meta?.instanceId === instanceId &&
                 guard(actionCreator)(action),
               options.saga({
-                actions: mapValues(actions, (actionCreator) => (...args) =>
-                  decorateAction(instanceId)(actionCreator(...args))
+                actions: mapValues(actions, actionCreator => (...args) =>
+                  decorateAction(instanceId)(actionCreator(...args)),
                 ),
                 getters,
                 guards: getGuards(instanceId),
-                select: (selector) =>
-                  select((state) =>
-                    selector(get(state, [modelName, instanceId]))
-                  ),
-                take: (pattern) => take(pattern),
-                put: (action) =>
+                select: selector =>
+                  selector
+                    ? select(state =>
+                        selector(get(state, [modelName, instanceId])),
+                      )
+                    : select(state => get(state, [modelName, instanceId])),
+                take: pattern => take(pattern),
+                put: action =>
                   put({
                     ...action,
                     meta: {
@@ -424,14 +465,14 @@ export const createModelContainer = (modelName, initialState) => {
                     },
                   }),
                 call: call,
-              })
+              }),
             );
           },
         };
       }
-      if (typeof options.reducer === "function") {
+      if (typeof options.reducer === 'function') {
         modelReducers[modelName] = reducer = reducer.handle(
-          on(actionCreator, options.reducer)
+          on(actionCreator, options.reducer),
         );
       }
     });
@@ -447,10 +488,11 @@ export const createModelContainer = (modelName, initialState) => {
     return getContext();
   }
   function getSaga(instanceId) {
-    return function* () {
+    return function*() {
       for (const saga of values(sagas)) {
         yield fork(saga, instanceId);
       }
     };
   }
+  return getContext();
 };
